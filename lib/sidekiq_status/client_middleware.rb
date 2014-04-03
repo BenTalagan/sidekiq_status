@@ -21,9 +21,9 @@ module SidekiqStatus
       # job is due to run.
       return yield if item['at']
 
-
-      jid  = item['jid']
-      args = item['args']
+      jid         = item['jid']
+      args        = item['args']
+      retry_count = item['retry_count']
 
       # If the args value is equal to [ jid ], this is most likely a retry for a failed job
       # We reload the original job arguments, so these are not lost
@@ -37,7 +37,8 @@ module SidekiqStatus
           'jid'    => jid,
           'worker' => worker.name,
           'queue'  => queue,
-          'args'   => args
+          'args'   => args,
+          'retry_count' => retry_count
       )
 
       yield

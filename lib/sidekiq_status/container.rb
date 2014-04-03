@@ -31,13 +31,14 @@ module SidekiqStatus
         'worker'  => 'SidekiqStatus::Worker',
         'queue'   => '',
         'status'  => 'waiting',
+        'retry_count' => 0,
         'at'      => 0,
         'total'   => 100,
         'message' => nil,
         'payload' => {}
     }.freeze
 
-    attr_reader :jid, :args, :worker, :queue
+    attr_reader :jid, :args, :worker, :queue, :retry_count
     attr_reader :status, :at, :total, :message, :last_updated_at
     attr_accessor :payload
 
@@ -291,6 +292,14 @@ module SidekiqStatus
     def message=(message)
       @message = message && message.to_s
     end
+    
+    # Retry_count of the job
+    #
+    # @param [Fixnum] count
+    def retry_count=(count)
+      raise ArgumentError, "count=#{total.inspect} is not a scalar number" unless total.is_a?(Numeric)
+      @retry_count = retry_count
+    end
 
     # Assign multiple values to {SidekiqStatus::Container} attributes at once
     #
@@ -325,6 +334,7 @@ module SidekiqStatus
       data = DEFAULTS.merge(data)
 
       @args, @worker, @queue         = data.values_at('args', 'worker', 'queue')
+      @retry_count                   = data['retry_count']
       @status, @at, @total, @message = data.values_at('status', 'at', 'total', 'message')
       @payload                       = data['payload']
       @last_updated_at               = data['last_updated_at'] && Time.at(data['last_updated_at'].to_i)
@@ -339,6 +349,8 @@ module SidekiqStatus
           'args'            => self.args,
           'worker'          => self.worker,
           'queue'           => self.queue,
+          
+          'retry_count'     => self.retry_count,
 
           'status'          => self.status,
           'at'              => self.at,
