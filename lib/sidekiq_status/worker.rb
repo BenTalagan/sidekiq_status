@@ -52,7 +52,7 @@ module SidekiqStatus
         self.sc.update_attributes('at' => at, 'message' => message)
       end
       
-      def retry_count(retry_count)
+      def retry_count=(retry_count)
         self.sc.update_attributes('retry_count' => retry_count)
       end
 

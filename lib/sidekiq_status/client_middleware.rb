@@ -23,8 +23,9 @@ module SidekiqStatus
 
       jid         = item['jid']
       args        = item['args']
-      retry_count = item['retry_count']
-
+      
+      retry_count = item['retry_count'] || -1
+      retry_count += 1
       # If the args value is equal to [ jid ], this is most likely a retry for a failed job
       # We reload the original job arguments, so these are not lost
       if args == Array(jid)
