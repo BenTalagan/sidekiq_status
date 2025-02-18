@@ -163,8 +163,8 @@ module SidekiqStatus
 
       threshold = Time.now - self.ttl
 
-      data = Sidekiq.redis do |conn|
-        conn.multi do
+      data = Sidekiq.redis do |sk_redis|
+        sk_redis.multi do |conn|
           conn.mget(*keys)
 
           conn.zremrangebyscore(kill_key, 0, threshold.to_i) # Clean up expired unprocessed kill requests
@@ -206,18 +206,23 @@ module SidekiqStatus
       data = dump
       data = Sidekiq.dump_json(data)
 
-      Sidekiq.redis do |conn|
-        conn.multi do
-          conn.setex(status_key, self.ttl, data)
-          conn.zadd(self.class.statuses_key, Time.now.to_f.to_s, self.jid)
+      # If the class job defines a ttl, use that one. Else, use default one.
+      worker_class = Kernel.const_get(self.worker)
+      expiry = ((worker_class.ttl)?(worker_class.ttl):(self.ttl))
+      fake_start_date = Time.now + expiry - self.ttl
+
+      Sidekiq.redis do |sk_redis|
+        sk_redis.multi do |conn|
+          conn.setex(status_key, expiry , data)
+          conn.zadd(self.class.statuses_key, fake_start_date.to_f.to_s, self.jid)
         end
       end
     end
 
     # Delete current container data from redis
     def delete
-      Sidekiq.redis do |conn|
-        conn.multi do
+      Sidekiq.redis do |sk_redis|
+        sk_redis.multi do |conn|
           conn.del(status_key)
 
           conn.zrem(self.class.kill_key, self.jid)
@@ -229,8 +234,13 @@ module SidekiqStatus
     # Request kill for the {SidekiqStatus::Worker SidekiqStatus job}
     # which parameters are tracked by the current {SidekiqStatus::Container}
     def request_kill
-      Sidekiq.redis do |conn|
-        conn.zadd(self.class.kill_key, Time.now.to_f.to_s, self.jid)
+      # If the class job defines a ttl, use that one. Else, use default one.
+      worker_class = Kernel.const_get(self.worker)
+      expiry = ((worker_class.ttl)?(worker_class.ttl):(self.ttl))
+      fake_start_date = Time.now + expiry - self.ttl
+
+      Sidekiq.redis do |sk_redis|
+        sk_redis.zadd(self.class.kill_key, fake_start_date.to_f.to_s, self.jid)
       end
     end
 
@@ -245,8 +255,8 @@ module SidekiqStatus
     def kill
       self.status = 'killed'
 
-      Sidekiq.redis do |conn|
-        conn.multi do
+      Sidekiq.redis do |sk_redis|
+        sk_redis.multi do |conn|
           save
           conn.zrem(self.class.kill_key, self.jid)
         end
@@ -292,7 +302,7 @@ module SidekiqStatus
     def message=(message)
       @message = message && message.to_s
     end
-    
+
     # Retry_count of the job
     #
     # @param [Fixnum] count
@@ -349,7 +359,7 @@ module SidekiqStatus
           'args'            => self.args,
           'worker'          => self.worker,
           'queue'           => self.queue,
-          
+
           'retry_count'     => self.retry_count,
 
           'status'          => self.status,

@@ -23,8 +23,9 @@ module SidekiqStatus
             super(*@status_container.args)
             set_status('complete')
           end
-        rescue Exception => exc
-          set_status('failed', exc.class.name + ': ' + exc.message + "   \n\n " + exc.backtrace.join("\n    "))
+        rescue StandardError => exc
+          set_status('failed', exc.class.name)
+          self.payload = exc.message
           raise exc
         end
       end
@@ -51,7 +52,7 @@ module SidekiqStatus
       def at(at, message = nil)
         self.sc.update_attributes('at' => at, 'message' => message)
       end
-      
+
       def retry_count=(retry_count)
         self.sc.update_attributes('retry_count' => retry_count)
       end
